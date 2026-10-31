@@ -1,0 +1,47 @@
+image:
+  repository: ghcr.io/isaac19911369/enterprise-rag-assistant
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+config:
+  RAG_RETRIEVER: hybrid
+  RAG_TOP_K: "4"
+  RAG_MIN_RELEVANCE: "0.12"
+  # Point at an in-cluster NVIDIA NIM / vLLM service, or Azure OpenAI.
+  LLM_BACKEND: openai
+  LLM_BASE_URL: http://llm-inference.inference.svc.cluster.local:8000/v1
+  LLM_MODEL: meta/llama-3.1-8b-instruct
+  # EMBEDDING_BASE_URL: http://nv-embedqa.inference.svc.cluster.local:8000/v1
+  # EMBEDDING_MODEL: nvidia/nv-embedqa-e5-v5
+
+# Secret with LLM_API_KEY / EMBEDDING_API_KEY (created by External Secrets / Key Vault CSI)
+existingSecret: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: nginx
+  host: assistant.example.internal
+  tls: []
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { memory: 1Gi }
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
