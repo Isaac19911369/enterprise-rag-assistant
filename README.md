@@ -120,6 +120,15 @@ at extension 4357 or through the portal. [1] ...
 | vLLM / Ollama | `LLM_BACKEND=openai LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=llama3.1` |
 | Dense retrieval (NIM embeddings) | `RAG_RETRIEVER=hybrid_dense EMBEDDING_BASE_URL=http://nv-embedqa:8000/v1 EMBEDDING_MODEL=nvidia/nv-embedqa-e5-v5` |
 
+### Real-model evaluation in GitHub Actions
+
+The [`Real-model evaluation`](.github/workflows/real-model-eval.yml) workflow runs the same evaluation against a hosted model and commits the report to [`eval/results/`](eval/results). Two providers are supported:
+
+- **NVIDIA API catalog:** add an `NVIDIA_API_KEY` secret.
+- **Azure OpenAI / Foundry:** add the `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` secrets.
+
+Then start it from **Actions → Real-model evaluation → Run workflow**, choosing the chat model and an optional embedding model. With an embedding model, the run also compares the `dense` and `hybrid_dense` retrievers against the lexical ones.
+
 ### API
 
 ```bash

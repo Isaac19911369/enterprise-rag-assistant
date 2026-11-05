@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from datetime import date
 from pathlib import Path
 
 from .assistant import Assistant
@@ -27,7 +28,13 @@ def _ask(args, settings: Settings) -> None:
 def _eval(args, settings: Settings) -> None:
     questions = load_questions(args.questions)
     chunks = load_corpus(settings.corpus_dir)
+    llm = settings.llm_model if settings.llm_backend == "openai" else "offline extractive"
     lines = [
+        f"# Evaluation: {llm}",
+        "",
+        f"Date: {date.today().isoformat()} · LLM backend: `{settings.llm_backend}` · "
+        f"retriever: `{settings.retriever}` · embeddings: `{settings.embedding_model or 'none'}`",
+        "",
         "## Retrieval (section-level, answerable questions)",
         "",
         "| Retriever | Hit@1 | Hit@3 | MRR@5 |",
@@ -54,7 +61,7 @@ def _eval(args, settings: Settings) -> None:
         f"| Latency p50 / p95 (ms) | {r['latency_ms_p50']:.1f} / {r['latency_ms_p95']:.1f} |",
     ]
     report = "\n".join(lines) + "\n"
-    print("\n".join(lines[lines.index("") + 1 :][-10:]))
+    print("\n".join(lines[-10:]))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.md").write_text(report)

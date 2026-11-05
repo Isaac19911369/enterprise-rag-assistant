@@ -16,8 +16,8 @@ class HybridRetriever(Retriever):
 
     name = "hybrid"
 
-    def __init__(self, retrievers: list[Retriever], k: int = 60):
-        self.retrievers, self.k = retrievers, k
+    def __init__(self, retrievers: list[Retriever], k: int = 60, name: str = "hybrid"):
+        self.retrievers, self.k, self.name = retrievers, k, name
 
     def fit(self, chunks):
         self.chunks = chunks

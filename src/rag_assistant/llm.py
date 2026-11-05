@@ -58,7 +58,9 @@ class OpenAICompatibleLLM(LLM):
         else:
             from openai import OpenAI
 
-            self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed")
+            self.client = OpenAI(
+                base_url=base_url, api_key=api_key or "not-needed", max_retries=6, timeout=120
+            )
         self.model, self.temperature = model, temperature
 
     def chat(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:

@@ -1,0 +1,92 @@
+name: Real-model evaluation
+
+# Runs the evaluation set against a real LLM and embedding model and commits the
+# report to eval/results/. Start it from the Actions tab ("Run workflow").
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   provider "nvidia": NVIDIA_API_KEY        (build.nvidia.com API catalog, OpenAI-compatible)
+#   provider "azure":  AZURE_OPENAI_ENDPOINT (https://<resource>.openai.azure.com)
+#                      AZURE_OPENAI_API_KEY  (deployment names go in the model inputs)
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Model provider"
+        type: choice
+        options: [nvidia, azure]
+        default: nvidia
+      llm_model:
+        description: "Chat model (NVIDIA model id or Azure deployment name)"
+        default: meta/llama-3.3-70b-instruct
+      embedding_model:
+        description: "Embedding model (empty = lexical retrieval only)"
+        default: nvidia/nv-embedqa-e5-v5
+
+permissions:
+  contents: write
+
+concurrency:
+  group: real-model-eval
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e .
+
+      - name: Configure provider
+        env:
+          PROVIDER: ${{ inputs.provider }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+        run: |
+          if [ "$PROVIDER" = nvidia ]; then
+            test -n "$NVIDIA_API_KEY" || { echo "::error::secret NVIDIA_API_KEY is not set"; exit 1; }
+            BASE=https://integrate.api.nvidia.com/v1; KEY=$NVIDIA_API_KEY
+          else
+            test -n "$AZURE_OPENAI_API_KEY" || { echo "::error::Azure secrets are not set"; exit 1; }
+            BASE="${AZURE_OPENAI_ENDPOINT%/}/openai/v1/"; KEY=$AZURE_OPENAI_API_KEY
+          fi
+          echo "::add-mask::$KEY"
+          {
+            echo "LLM_BACKEND=openai"
+            echo "LLM_BASE_URL=$BASE"
+            echo "LLM_API_KEY=$KEY"
+            echo "EMBEDDING_BASE_URL=$BASE"
+            echo "EMBEDDING_API_KEY=$KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Evaluate
+        env:
+          LLM_MODEL: ${{ inputs.llm_model }}
+          EMBEDDING_MODEL: ${{ inputs.embedding_model }}
+          PROVIDER: ${{ inputs.provider }}
+        run: |
+          SLUG=$(echo "$PROVIDER-$LLM_MODEL" | tr '/:.' '---' | tr '[:upper:]' '[:lower:]')
+          echo "SLUG=$SLUG" >> "$GITHUB_ENV"
+          if [ -n "$EMBEDDING_MODEL" ]; then
+            export RAG_RETRIEVER=hybrid_dense
+            RETRIEVERS="bm25 hybrid dense hybrid_dense"
+          else
+            unset EMBEDDING_MODEL
+            RETRIEVERS="bm25 hybrid"
+          fi
+          rag-assistant eval --retrievers $RETRIEVERS --out "eval/results/$SLUG"
+          cat "eval/results/$SLUG/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add eval/results
+          git commit -m "Real-model evaluation: $SLUG" || echo "no changes"
+          git push

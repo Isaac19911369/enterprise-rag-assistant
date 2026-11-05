@@ -15,7 +15,12 @@ def _dense(settings: Settings) -> Retriever:
 
     if not settings.embedding_model:
         raise ValueError("dense retrieval needs EMBEDDING_MODEL (and EMBEDDING_BASE_URL)")
-    client = OpenAI(base_url=settings.embedding_base_url, api_key=settings.embedding_api_key)
+    client = OpenAI(
+        base_url=settings.embedding_base_url,
+        api_key=settings.embedding_api_key,
+        max_retries=6,
+        timeout=120,
+    )
     return EmbeddingRetriever(client, settings.embedding_model)
 
 
@@ -32,5 +37,5 @@ def build_retriever(name: str, settings: Settings | None = None) -> Retriever:
     if name == "dense":
         return _dense(settings)
     if name == "hybrid_dense":
-        return HybridRetriever([BM25Retriever(), _dense(settings)])
+        return HybridRetriever([BM25Retriever(), _dense(settings)], name="hybrid_dense")
     raise ValueError(f"unknown retriever {name!r}; choose from {RETRIEVERS}")
