@@ -168,6 +168,19 @@ eval/questions.jsonl       # evaluation set
 deploy/helm/rag-assistant  # Helm chart
 ```
 
+## How this was built
+
+I built this project AI-agent-first with **Claude Code**. My role was the part that decides whether the result can be trusted: the architecture, the threat model (what must never leak, what must never run without confirmation), the acceptance criteria, and reviewing every change. Claude Code wrote most of the implementation in small, reviewable steps.
+
+What keeps an agent-written codebase honest is the set of gates every change has to pass:
+
+- **Tests first for the risky parts.** Access control, citation validation, PII redaction and the tool confirmation gate are covered by unit tests, so a regression fails loudly instead of quietly leaking data.
+- **An offline, deterministic backend.** Tests, CI and the evaluation run without API keys and give the same result on every run, so a changed number means changed behaviour.
+- **The evaluation set as a regression gate.** CI runs `rag-assistant eval` on every push and writes the report to the job summary. A separate workflow runs the same evaluation against a real model (NVIDIA API catalog or Azure OpenAI).
+- **Lint and format checks** (`ruff`), plus `helm lint`, a rendered Helm template and a Docker build in CI.
+
+The rule I follow: the agent may write the code, but it never decides what "correct" means. The specification, the tests and the evaluation do.
+
 ## Limitations and next steps
 
 - **Pattern-based guardrails are only the first layer.** Add a model-based classifier (NeMo Guardrails, Azure AI Content Safety Prompt Shields) for paraphrased attacks.
